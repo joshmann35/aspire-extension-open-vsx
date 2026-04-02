@@ -24,8 +24,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: 'npm'
-          cache-dependency-path: 'upstream/extension/package-lock.json'
+          # cache: 'npm'
+          # cache-dependency-path: 'upstream/extension/package-lock.json'
 
       - name: Apply Patches
         run: |
@@ -41,7 +41,7 @@ jobs:
           # 3. Update Publisher to "joshmann"
           # We use jq for clean JSON manipulation
           jq '.publisher = "joshmann" | .version + "-patch"' package.json > temp.json && mv temp.json package.json
-          jq '.version + "-patch" | .packages[""].version + "-patch"' package-lock.json > temp.json && mv temp.json package-lock.json
+          jq '.version + "-patch"' package-lock.json > temp.json && mv temp.json package-lock.json
           jq '.["extension.description"] = "Unofficial Aspire extension for VSCode forks supporting the muhammad-sammy.csharp extension"' package.nls.json > temp.json && mv temp.json package.nls.json
           
           echo "Patches applied successfully."
