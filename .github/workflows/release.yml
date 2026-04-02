@@ -27,7 +27,25 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'upstream/extension/package-lock.json'
 
+      - name: Check if Version Exists on Open VSX
+        id: check_version
+        run: |
+          # Get version from upstream
+          VERSION=$(jq -r '.version' upstream/extension/package.json)
+          echo "Upstream version is $VERSION"
+          
+          # Check Open VSX (Update 'joshm' and 'aspire-extension' to your actual values)
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://open-vsx.org/api/joshmann/aspire-vscode/$VERSION)
+          
+          if [ "$STATUS_CODE" -eq "200" ]; then
+            echo "Version $VERSION already exists. Skipping."
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Apply Patches
+        if: steps.check_version.outputs.skip == 'false'
         run: |
           # 1. Apply git patch
           git apply --directory=upstream aspire-changes.patch
@@ -37,16 +55,17 @@ jobs:
           # 2. Update README.md with warning
           sed -i 's/official/unofficial/g' README.md
           sed -i '1i THIS IS NOT THE OFFICIAL ASPIRE EXTENSION. ANY ISSUES SHOULD NOT BE SENT TO THE ASPIRE GITHUB PAGE.\n\nThis extension allows the muhammad-sammy.csharp extension to work for debugging Aspire projects.\n' README.md
-          
+          npm version patch
           # 3. Update Publisher to "joshmann"
           # We use jq for clean JSON manipulation
-          jq '.publisher = "joshmann" | .version += ".1-patch"' package.json > temp.json && mv temp.json package.json
-          jq '.version += ".1-patch" | .packages[""].version += ".1-patch"' package-lock.json > temp.json && mv temp.json package-lock.json
+          jq '.publisher = "joshmann" | .version += "-patch"' package.json > temp.json && mv temp.json package.json
+          jq '.version += "-patch" | .packages[""].version += "-patch"' package-lock.json > temp.json && mv temp.json package-lock.json
           jq '.["extension.description"] = "Unofficial Aspire extension for VSCode forks supporting the muhammad-sammy.csharp extension"' package.nls.json > temp.json && mv temp.json package.nls.json
           
           echo "Patches applied successfully."
 
       - name: Install Dependencies and Build
+        if: steps.check_version.outputs.skip == 'false'
         run: |
           cd upstream/extension
 
@@ -55,6 +74,7 @@ jobs:
           npx @vscode/vsce package
 
       - name: Publish to Open VSX
+        if: steps.check_version.outputs.skip == 'false'
         run: |
           cd upstream/extension
           # This finds the generated .vsix and pushes it
