@@ -39,7 +39,7 @@ jobs:
           
           if [ "$STATUS_CODE" -eq "200" ]; then
             echo "Version $VERSION already exists. Skipping."
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=true" >> $GITHUB_OUTPUT
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
@@ -55,11 +55,10 @@ jobs:
           # 2. Update README.md with warning
           sed -i 's/official/unofficial/g' README.md
           sed -i '1i THIS IS NOT THE OFFICIAL ASPIRE EXTENSION. ANY ISSUES SHOULD NOT BE SENT TO THE ASPIRE GITHUB PAGE.\n\nThis extension allows the muhammad-sammy.csharp extension to work for debugging Aspire projects.\n' README.md
-          npm version patch
+
           # 3. Update Publisher to "joshmann"
           # We use jq for clean JSON manipulation
-          jq '.publisher = "joshmann" | .version += "-patch"' package.json > temp.json && mv temp.json package.json
-          jq '.version += "-patch" | .packages[""].version += "-patch"' package-lock.json > temp.json && mv temp.json package-lock.json
+          jq '.publisher = "joshmann"' package.json > temp.json && mv temp.json package.json
           jq '.["extension.description"] = "Unofficial Aspire extension for VSCode forks supporting the muhammad-sammy.csharp extension"' package.nls.json > temp.json && mv temp.json package.nls.json
           
           echo "Patches applied successfully."
