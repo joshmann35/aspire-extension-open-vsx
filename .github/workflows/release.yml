@@ -51,7 +51,7 @@ jobs:
           cd upstream/extension
           rm -rf node_modules package-lock.json
           npm cache clean --force
-          npm install
+          npm install --force --legacy-peer-deps
           # The Aspire extension uses 'vsce package' to build the .vsix
           npx @vscode/vsce package
 
