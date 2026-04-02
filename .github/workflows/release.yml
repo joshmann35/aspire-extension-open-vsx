@@ -1,0 +1,55 @@
+name: Patch and Publish Aspire Extension
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Checks daily at midnight
+  workflow_dispatch:   # Allows you to run it manually
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Wrapper Repo
+        uses: actions/checkout@v4
+
+      - name: Clone Microsoft Aspire Repo
+        run: |
+          # We use a sparse checkout to only get the extension directory
+          git clone --filter=blob:none --sparse https://github.com/microsoft/aspire.git upstream
+          cd upstream
+          git sparse-checkout set extension
+          cd ..
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: 'upstream/extension/package-lock.json'
+
+      - name: Apply Patches
+        run: |
+          cd upstream/extension
+          
+          # 1. Replace the C# extension reference in all files
+          # Using LC_ALL=C to avoid encoding issues with sed
+          find . -type f -exec sed -i 's/ms-dotnettools.csharp/muhammad-sammy.csharp/g' {} +
+          
+          # 2. Update Publisher to "joshm"
+          # We use jq for clean JSON manipulation
+          jq '.publisher = "joshmann"' package.json > temp.json && mv temp.json package.json
+          
+          echo "Patches applied successfully."
+
+      - name: Install Dependencies and Build
+        run: |
+          cd upstream/extension
+          npm install
+          # The Aspire extension uses 'vsce package' to build the .vsix
+          npx @vscode/vsce package
+
+      - name: Publish to Open VSX
+        run: |
+          cd upstream/extension
+          # This finds the generated .vsix and pushes it
+          npx ovsx publish $(ls *.vsix) -p ${{ secrets.OPEN_VSX_TOKEN }}
