@@ -29,11 +29,9 @@ jobs:
 
       - name: Apply Patches
         run: |
-          cd upstream/extension
+          git apply --directory=upstream aspire-changes.patch
           
-          # 1. Replace the C# extension reference in all files
-          # Using LC_ALL=C to avoid encoding issues with sed
-          find . -type f -exec sed -i 's/ms-dotnettools.csharp/muhammad-sammy.csharp/g' {} +
+          cd upstream/extension
           
           # 2. Update Publisher to "joshm"
           # We use jq for clean JSON manipulation
