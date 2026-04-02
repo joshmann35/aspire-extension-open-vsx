@@ -1,0 +1,99 @@
+diff --git a/extension/src/capabilities.ts b/extension/src/capabilities.ts
+index d1f208179..dd783acd5 100644
+--- a/extension/src/capabilities.ts
++++ b/extension/src/capabilities.ts
+@@ -11,6 +11,7 @@ export type Capability =
+     | 'ms-dotnettools.csdevkit' // Older AppHost versions used this extension identifier instead of devkit
+     | 'project' // Support for running C# projects
+     | 'ms-dotnettools.csharp' // Older AppHost versions used this extension identifier instead of project
++    | 'muhammad-sammy.csharp' // Older AppHost versions used this extension identifier instead of project
+     | 'python' // Support for running Python projects
+     | 'ms-python.python' // Older AppHost versions used this extension identifier instead of python
+     | 'node' // Support for running Node.js projects
+@@ -29,7 +30,7 @@ export function isCsDevKitInstalled() {
+ }
+ 
+ export function isCsharpInstalled() {
+-    return isExtensionInstalled("ms-dotnettools.csharp");
++    return isExtensionInstalled("ms-dotnettools.csharp") || isExtensionInstalled("muhammad-sammy.csharp");
+ }
+ 
+ export function isPythonInstalled() {
+@@ -56,6 +57,7 @@ export function getSupportedCapabilities(): Capabilities {
+     if (isCsharpInstalled()) {
+         capabilities.push("project");
+         capabilities.push("ms-dotnettools.csharp");
++        capabilities.push("muhammad-sammy.csharp");
+ 
+         // Azure Functions debugging requires both C# (coreclr attach to the worker
+         // process) and the Azure Functions extension (to launch func host start).
+diff --git a/extension/src/dcp/AspireDcpServer.ts b/extension/src/dcp/AspireDcpServer.ts
+index 2b7815a1e..4e04a8e48 100644
+--- a/extension/src/dcp/AspireDcpServer.ts
++++ b/extension/src/dcp/AspireDcpServer.ts
+@@ -136,12 +136,25 @@ export default class AspireDcpServer {
+                     return;
+                 }
+ 
++                let args = payload.args;
++                if(!args){
++                    args = [];
++                }
++                if (typeof args === 'string') {
++                    args = [args];
++                }
++
++                let envVars = payload.env ?? [];
++                if (!Array.isArray(envVars) && typeof envVars === 'object' && envVars !== null) {
++                    envVars = Object.entries(envVars as any).map(([name, value]) => ({ name, value: String(value) }));
++                }
++
+                 try {
+                     const config = await createDebugSessionConfiguration(
+                         aspireDebugSession.configuration,
+                         launchConfig,
+-                        payload.args,
+-                        payload.env ?? [],
++                        args,
++                        envVars,
+                         { debug: launchConfig.mode === "Debug", runId, debugSessionId: dcpId, isApphost: false, debugSession: aspireDebugSession },
+                         foundDebuggerExtension
+                     );
+diff --git a/extension/src/debugger/languages/azureFunctions.ts b/extension/src/debugger/languages/azureFunctions.ts
+index 56187fa13..42c45d3a9 100644
+--- a/extension/src/debugger/languages/azureFunctions.ts
++++ b/extension/src/debugger/languages/azureFunctions.ts
+@@ -84,7 +84,7 @@ async function getAzureFunctionsApi(): Promise<AzureFunctionsApi> {
+ export const azureFunctionsDebuggerExtension: ResourceDebuggerExtension = {
+     resourceType: 'azure-functions',
+     debugAdapter: 'coreclr',
+-    extensionId: 'ms-dotnettools.csharp',
++    extensionId: 'muhammad-sammy.csharp',
+     getDisplayName: (launchConfig: ExecutableLaunchConfiguration) => {
+         if (isAzureFunctionsLaunchConfiguration(launchConfig) && launchConfig.project_path) {
+             return `Azure Functions: ${path.basename(launchConfig.project_path)}`;
+diff --git a/extension/src/debugger/languages/dotnet.ts b/extension/src/debugger/languages/dotnet.ts
+index 1d2b4287d..20af1b98d 100644
+--- a/extension/src/debugger/languages/dotnet.ts
++++ b/extension/src/debugger/languages/dotnet.ts
+@@ -42,7 +42,10 @@ class DotNetService implements IDotNetService {
+     }
+ 
+     async getAndActivateDevKit(): Promise<boolean> {
+-        const csharpDevKit = vscode.extensions.getExtension('ms-dotnettools.csdevkit');
++        let csharpDevKit = vscode.extensions.getExtension('ms-dotnettools.csdevkit');
++        if (!csharpDevKit) {
++            csharpDevKit = vscode.extensions.getExtension('muhammad-sammy.csharp');
++        }
+         if (!csharpDevKit) {
+             // If c# dev kit is not installed, we will have already built this project on the command line using the Aspire CLI
+             // thus we should just immediately return
+@@ -195,7 +198,7 @@ export function createProjectDebuggerExtension(dotNetServiceProducer: (debugSess
+     return {
+         resourceType: 'project',
+         debugAdapter: 'coreclr',
+-        extensionId: 'ms-dotnettools.csharp',
++        extensionId: 'muhammad-sammy.csharp',
+         getDisplayName: (launchConfig: ExecutableLaunchConfiguration) => `C#: ${path.basename((launchConfig as ProjectLaunchConfiguration).project_path)}`,
+         getSupportedFileTypes: () => ['.cs', '.csproj'],
+         getProjectFile: (launchConfig) => {
