@@ -97,3 +97,90 @@ index 1d2b4287d..20af1b98d 100644
          getDisplayName: (launchConfig: ExecutableLaunchConfiguration) => `C#: ${path.basename((launchConfig as ProjectLaunchConfiguration).project_path)}`,
          getSupportedFileTypes: () => ['.cs', '.csproj'],
          getProjectFile: (launchConfig) => {
+diff --git a/extension/src/debugger/launchProfiles.ts b/extension/src/debugger/launchProfiles.ts
+index a79cf2a9a..5c61517f2 100644
+--- a/extension/src/debugger/launchProfiles.ts
++++ b/extension/src/debugger/launchProfiles.ts
+@@ -28,10 +28,16 @@ export interface LaunchProfile {
+ }
+ 
+ /**
+- * Expands environment variable references in a string.
++ * Expands environment variable references in a string or array of strings.
+  * Supports $(VAR) and %VAR% syntax used by launch profiles.
+  */
+-export function expandEnvironmentVariables(value: string): string {
++export function expandEnvironmentVariables(value: string): string;
++export function expandEnvironmentVariables(value: string[]): string[];
++export function expandEnvironmentVariables(value: string | string[]): string | string[] {
++    if (Array.isArray(value)) {
++        return value.map(v => expandEnvironmentVariables(v));
++    }
++
+     // Expand $(VAR) syntax (used by VS and MSBuild-style launch profiles)
+     let result = value.replace(/\$\(([^)]+)\)/g, (_, varName) => process.env[varName] ?? '');
+     // Expand %VAR% syntax (Windows)
+@@ -203,23 +209,60 @@ export function mergeEnvironmentVariables(
+ export function determineArguments(
+     baseProfileArgs: string | undefined,
+     runSessionArgs: string[] | undefined | null
+-): string | undefined {
++): string[] | undefined {
+     // If run session args are explicitly provided (including empty array), use them
+     if (runSessionArgs !== undefined && runSessionArgs !== null) {
+         extensionLogOutputChannel.debug(`Using run session arguments: ${JSON.stringify(runSessionArgs)}`);
+-        return runSessionArgs.join(' ');
++        return runSessionArgs;
+     }
+ 
+     // If run session args are absent/null, use launch profile args if available
+     if (baseProfileArgs) {
+         extensionLogOutputChannel.debug(`Using launch profile arguments: ${baseProfileArgs}`);
+-        return baseProfileArgs;
++        return splitArguments(baseProfileArgs);
+     }
+ 
+     extensionLogOutputChannel.debug('No arguments determined');
+     return undefined;
+ }
+ 
++/**
++ * Splits a command line string into an array of arguments, respecting quotes.
++ */
++function splitArguments(args: string): string[] {
++    const result: string[] = [];
++    let current = '';
++    let inQuotes = false;
++    let quoteChar = '';
++
++    for (let i = 0; i < args.length; i++) {
++        const char = args[i];
++        if (inQuotes) {
++            if (char === quoteChar) {
++                inQuotes = false;
++            } else {
++                current += char;
++            }
++        } else {
++            if (char === '"' || char === "'") {
++                inQuotes = true;
++                quoteChar = char;
++            } else if (char === ' ') {
++                if (current.length > 0) {
++                    result.push(current);
++                    current = '';
++                }
++            } else {
++                current += char;
++            }
++        }
++    }
++    if (current.length > 0) {
++        result.push(current);
++    }
++    return result;
++}
++
+ /**
+  * Determines the working directory for project execution
+  * Uses launch profile WorkingDirectory if specified, otherwise uses project directory
