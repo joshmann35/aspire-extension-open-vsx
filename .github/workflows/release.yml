@@ -24,8 +24,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: 'npm'
-          cache-dependency-path: 'upstream/extension/package-lock.json'
+          cache: 'yarn'
+          cache-dependency-path: 'upstream/extension/yarn.lock'
 
       - name: Check if Version Exists on Open VSX
         id: check_version
